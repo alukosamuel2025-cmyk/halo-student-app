@@ -1,10 +1,10 @@
 import React from "react";
-import { ChevronLeft, GraduationCap } from "lucide-react";
+import { ChevronLeft, GraduationCap, LogOut, UserRound } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import { ACCENT, ACCENT_TO } from "../lib/constants";
 import { spawnRipple, bounceClick } from "../lib/helpers";
 
-function Settings({ T, theme, setTheme, onClose, notifyPermission, requestNotifyPermission, resetData, saveError }) {
+function Settings({ T, theme, setTheme, onClose, notifyPermission, requestNotifyPermission, resetData, saveError, userEmail, onSignOut }) {
   const notifyLabel =
     notifyPermission === "granted" ? "Enabled" : notifyPermission === "denied" ? "Blocked in browser" : "Not enabled";
 
@@ -26,6 +26,32 @@ function Settings({ T, theme, setTheme, onClose, notifyPermission, requestNotify
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-10 flex flex-col gap-5">
+        {/* Account */}
+        <div className="rounded-2xl p-4" style={{ background: T.card }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: T.input }}>
+              <UserRound size={16} color={T.textMuted} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-medium truncate" style={{ color: T.text }}>
+                {userEmail || "Guest account"}
+              </p>
+              <p className="text-[11.5px]" style={{ color: T.textMuted }}>
+                {userEmail ? "Signed in with email" : "Data stays on this device only"}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={(e) => { bounceClick(e); onSignOut(); }}
+            onPointerDown={(e) => spawnRipple(e, "rgba(108,92,231,0.18)")}
+            className="rounded-xl py-2.5 text-[13px] font-semibold w-full flex items-center justify-center gap-2 relative overflow-hidden pressable"
+            style={{ background: T.input, color: T.text }}
+          >
+            <LogOut size={14} />
+            Sign out
+          </button>
+        </div>
+
         {/* Appearance */}
         <div className="rounded-2xl p-4 flex items-center justify-between" style={{ background: T.card }}>
           <div>
