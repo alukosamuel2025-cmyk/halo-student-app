@@ -11,6 +11,7 @@ import Subjects from "./components/Subjects";
 import Planner from "./components/Planner";
 import Insights from "./components/Insights";
 import Settings from "./components/Settings";
+import AuthScreen from "./components/AuthScreen";
 
 import { THEMES, ACCENT, TAB_ORDER, CLASSES } from "./lib/constants";
 import { uid } from "./lib/helpers";
@@ -19,7 +20,7 @@ import { useAuth } from "./hooks/useAuth";
 import { loadState, saveState } from "./lib/cloudStorage";
 
 export default function App() {
-  const { user, authReady } = useAuth();
+  const { user, authChecked, signIn, signUp, signInGuest, signOutUser } = useAuth();
 
   const [tab, setTab] = useState("home");
   const [subjects, setSubjects] = useState(seedSubjects);
@@ -76,7 +77,6 @@ export default function App() {
     });
   }
 
-  // Poll for reminders that have come due, and alert once per reminder
   useEffect(() => {
     if (!loaded) return;
     const check = () => {
@@ -95,43 +95,51 @@ export default function App() {
     return () => clearInterval(interval);
   }, [reminders, loaded]);
 
-  // Keep the splash on screen for a minimum beat so it never just flickers
   useEffect(() => {
     const t = setTimeout(() => setMinTimeDone(true), 1500);
     return () => clearTimeout(t);
   }, []);
 
-  // Once data is loaded AND the minimum time has passed, fade the splash out
   useEffect(() => {
-    if (loaded && minTimeDone && !splashFading) {
+    if (minTimeDone && authChecked && (!user || loaded) && !splashFading) {
       setSplashFading(true);
       const t = setTimeout(() => setSplashVisible(false), 500);
       return () => clearTimeout(t);
     }
-  }, [loaded, minTimeDone, splashFading]);
+  }, [minTimeDone, authChecked, user, loaded, splashFading]);
 
-  // Load persisted data from Firestore once we have a signed-in (anonymous) user
   useEffect(() => {
-    if (!authReady || !user) return;
+    if (authChecked && !user) {
+      setLoaded(false);
+    }
+  }, [authChecked, user]);
+
+  useEffect(() => {
+    if (!authChecked || !user) return;
     (async () => {
       try {
         const data = await loadState(user.uid);
         if (data) {
-          if (data.subjects) setSubjects(data.subjects);
-          if (data.tasks) setTasks(data.tasks);
-          if (data.notes) setNotes(data.notes);
-          if (data.reminders) setReminders(data.reminders);
-          if (data.theme) setTheme(data.theme);
+          setSubjects(data.subjects || seedSubjects);
+          setTasks(data.tasks || seedTasks());
+          setNotes(data.notes || seedNotes());
+          setReminders(data.reminders || seedReminders());
+          setTheme(data.theme || "light");
+        } else {
+          setSubjects(seedSubjects);
+          setTasks(seedTasks());
+          setNotes(seedNotes());
+          setReminders(seedReminders());
+          setTheme("light");
         }
       } catch (e) {
-        // no saved data yet, or offline — keep defaults
+        // offline or first run — keep whatever's in state
       } finally {
         setLoaded(true);
       }
     })();
-  }, [authReady, user]);
+  }, [authChecked, user]);
 
-  // Persist to Firestore whenever data changes (after initial load)
   useEffect(() => {
     if (!loaded || !user) return;
     (async () => {
@@ -158,6 +166,11 @@ export default function App() {
     }
   };
 
+  const handleSignOut = async () => {
+    setSettingsOpen(false);
+    await signOutUser();
+  };
+
   const T = THEMES[theme];
 
   return (
@@ -168,7 +181,6 @@ export default function App() {
       >
         {splashVisible && <Splash fading={splashFading} />}
 
-        {/* Toast notifications */}
         <div className="absolute top-3 left-3 right-3 z-40 flex flex-col gap-2 pointer-events-none">
           {toasts.map((t) => (
             <div
@@ -188,7 +200,11 @@ export default function App() {
           ))}
         </div>
 
-        {!loaded ? (
+        {!authChecked ? (
+          <div className="flex-1" />
+        ) : !user ? (
+          <AuthScreen signIn={signIn} signUp={signUp} signInGuest={signInGuest} />
+        ) : !loaded ? (
           <div className="flex-1 flex items-center justify-center">
             <Spinner color={T.text} />
           </div>
@@ -247,7 +263,7 @@ export default function App() {
           </div>
         )}
 
-        {settingsOpen && (
+        {settingsOpen && user && (
           <Settings
             T={T}
             theme={theme}
@@ -257,11 +273,13 @@ export default function App() {
             requestNotifyPermission={requestNotifyPermission}
             resetData={resetData}
             saveError={saveError}
+            userEmail={user.isAnonymous ? null : user.email}
+            onSignOut={handleSignOut}
           />
         )}
 
-        <BottomNav tab={tab} setTab={setTab} T={T} />
+        {user && <BottomNav tab={tab} setTab={setTab} T={T} />}
       </div>
     </div>
   );
-      }
+}
